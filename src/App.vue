@@ -393,9 +393,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-shell'
+
+let unlistenSyncNow = null
+let unlistenToggleAutoSync = null
 
 // Reactive state
 const darkMode = ref(true)
@@ -414,7 +418,6 @@ const syncInterval = ref(null)
 const showSuccessToast = ref(false)
 const successMessage = ref('')
 const subscriptionTiers = ref([])
-
 const followersCount = ref(0)
 const subscribersCount = ref(0)
 const lastFollowersSync = ref('')
@@ -454,7 +457,8 @@ async function fetchFanslyData() {
   
   try {
     const data = await invoke('fetch_fansly_data', {
-      authToken: authToken.value
+      endpoint: '/api/v1/account',
+      authorizationToken: authToken.value
     })
     
     fanslyData.value = data
@@ -479,17 +483,16 @@ async function fetchSubscriptionTiers() {
   error.value = ''
   try {
     const tiers = await invoke('fetch_subscription_tiers', {
-      authToken: authToken.value,
-      userId: fanslyData.value.id
+      authorizationToken: authToken.value
     })
     subscriptionTiers.value = tiers
     showSuccess('Subscription tiers fetched successfully!')
     
     // Also sync the tiers data
     if (accountData.value) {
-      await invoke('sync_data', {
-        sync_key: accountData.value.sync_key,
-        data_type: 'tiers',
+      await invoke('sync_data_enhanced', {
+        syncKey: accountData.value.sync_key,
+        dataType: 'tiers',
         data: tiers
       })
     }
@@ -511,11 +514,7 @@ async function createAccount() {
   
   try {
     const data = await invoke('create_account', {
-      fanslyUserId: fanslyData.value.id,
-      email: fanslyData.value.email,
-      username: fanslyData.value.username,
-      displayName: fanslyData.value.displayName,
-      isCreator: isCreator.value
+      syncKey: `fansly_${fanslyData.value.response?.[0]?.id || Date.now()}`
     })
             
     accountData.value = data
@@ -532,28 +531,22 @@ async function createAccount() {
   }
 }
 
-
 function downloadCredentials() {
   if (!accountData.value) return
-
   const credentials = {
-    account_id: accountData.value.account_id,
-    password: accountData.value.password,
     sync_key: accountData.value.sync_key,
-    dashboard_url: 'https://your-dashboard-url.com',
+    api_base_url: accountData.value.api_base_url,
     created_at: new Date().toISOString(),
     instructions: {
-      login: 'Use account_id and password to log into the dashboard',
       sync: 'The sync_key is used for automatic data synchronization',
       security: 'Keep these credentials secure and do not share them'
     }
   }
-
   const blob = new Blob([JSON.stringify(credentials, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `fansly-credentials-${accountData.value.account_id}.json`
+  a.download = `fansly-credentials-${Date.now()}.json`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
@@ -607,73 +600,75 @@ function updateNextSyncTime() {
   }
 }
 
-
 async function performSync() {
-  // Debug logging
   console.log('performSync called')
   console.log('accountData:', accountData.value)
   console.log('authToken:', authToken.value ? 'Present' : 'Missing')
   console.log('fanslyData:', fanslyData.value)
-
-  // More specific error checking
+  
   if (!accountData.value) {
     error.value = 'Account data is missing. Please create an account first.'
     return
   }
-
   if (!authToken.value) {
     error.value = 'Authorization token is missing. Please enter your Fansly auth token.'
     return
   }
-
   if (!fanslyData.value) {
     error.value = 'Fansly data is missing. Please fetch your Fansly data first.'
     return
   }
-
   if (!accountData.value.sync_key) {
     error.value = 'Sync key is missing from account data.'
     return
   }
-
-  if (!fanslyData.value.id) {
-    error.value = 'Fansly user ID is missing.'
-    return
-  }
-
+  
   loading.value = true
   error.value = ''
   
   try {
     console.log('Starting sync with:', {
       syncKey: accountData.value.sync_key,
-      userId: fanslyData.value.id,
       hasAuthToken: !!authToken.value
     })
-
-    // Use the batch sync function for better efficiency
-    const syncResults = await invoke('sync_all_data', {
-      syncKey: accountData.value.sync_key,
-      authToken: authToken.value,
-      userId: fanslyData.value.id
-    })
-
-    // Process results
-    let totalSynced = 0
-    let syncSummary = []
-        
-    for (const result of syncResults) {
-      if (result.synced_count) {
-        totalSynced += result.synced_count
-      }
-      syncSummary.push(result.message)
+    
+    // Fetch and sync all data
+    const allData = {
+      profile: fanslyData.value,
+      followers_subscribers: null,
+      subscription_tiers: null,
+      timestamp: new Date().toISOString()
     }
+    
+    // Fetch followers and subscribers
+    try {
+      allData.followers_subscribers = await invoke('fetch_followers_and_subscribers', {
+        authorizationToken: authToken.value
+      })
+    } catch (err) {
+      console.warn('Failed to fetch followers/subscribers:', err)
+    }
+    
+    // Fetch subscription tiers
+    try {
+      allData.subscription_tiers = await invoke('fetch_subscription_tiers', {
+        authorizationToken: authToken.value
+      })
+    } catch (err) {
+      console.warn('Failed to fetch subscription tiers:', err)
+    }
+    
+    // Sync all data
+    const syncResult = await invoke('sync_all_data', {
+      syncKey: accountData.value.sync_key,
+      allData: allData
+    })
     
     lastSyncTime.value = new Date().toLocaleTimeString()
     updateNextSyncTime()
-        
-    showSuccess(`Sync completed! ${totalSynced} items synced. ${syncSummary.join(', ')}`)
-      
+    
+    showSuccess(`Sync completed! ${syncResult.message}`)
+    
   } catch (err) {
     error.value = `Sync failed: ${err}`
     console.error('Sync error:', err)
@@ -682,27 +677,6 @@ async function performSync() {
   }
 }
 
-// Alternative manual sync function that uses the enhanced sync
-async function manualSync() {
-  // Debug logging
-  console.log('manualSync called')
-  console.log('Current state:', {
-    hasAccountData: !!accountData.value,
-    hasAuthToken: !!authToken.value,
-    hasFanslyData: !!fanslyData.value,
-    autoSyncEnabled: autoSyncEnabled.value
-  })
-
-  if (!autoSyncEnabled.value) {
-    error.value = 'Auto sync must be enabled to perform manual sync'
-    return
-  }
-
-  // Use the enhanced sync function instead
-  await manualSyncWithProgress()
-}
-
-// Updated manualSyncWithProgress function
 async function manualSyncWithProgress() {
   if (!accountData.value) {
     error.value = 'Account data is missing. Please create an account first.'
@@ -715,56 +689,65 @@ async function manualSyncWithProgress() {
   
   loading.value = true
   error.value = ''
-      
+  
   try {
     // Auto-fetch fansly data if missing
     if (!fanslyData.value) {
       showSuccess('Fetching your Fansly profile data...')
       const data = await invoke('fetch_fansly_data', {
-        authToken: authToken.value
+        endpoint: '/api/v1/account',
+        authorizationToken: authToken.value
       })
       fanslyData.value = data
       localStorage.setItem('fansly_data', JSON.stringify(data))
     }
-
-    // Fetch followers and subscribers with better error handling
+    
+    // Fetch followers and subscribers
     showSuccess('Fetching followers and subscribers...')
-        
     let syncData
     try {
       syncData = await invoke('fetch_followers_and_subscribers', {
-        authToken: authToken.value,
-        userId: fanslyData.value.id
+        authorizationToken: authToken.value
       })
       console.log('Successfully fetched followers/subscribers:', syncData)
     } catch (err) {
       console.error('Error fetching followers/subscribers:', err)
-      // Show the actual error to help debug
       error.value = `Failed to fetch followers/subscribers: ${err}`
       return
     }
-            
-    // Fetch subscription tiers with better error handling
+    
+    // Fetch subscription tiers
     showSuccess('Fetching subscription tiers...')
-        
     let tiers
     try {
       tiers = await invoke('fetch_subscription_tiers', {
-        authToken: authToken.value,
-        userId: fanslyData.value.id
+        authorizationToken: authToken.value
       })
       console.log('Successfully fetched subscription tiers:', tiers)
     } catch (err) {
       console.error('Error fetching subscription tiers:', err)
-      // Show the actual error to help debug
       error.value = `Failed to fetch subscription tiers: ${err}`
       return
     }
-            
-    // Continue with sync...
-    showSuccess('Syncing data to server...')
     
-    // Rest of your sync logic...
+    // Sync all data
+    showSuccess('Syncing data to server...')
+    const allData = {
+      profile: fanslyData.value,
+      followers_subscribers: syncData,
+      subscription_tiers: tiers,
+      timestamp: new Date().toISOString()
+    }
+    
+    const syncResult = await invoke('sync_all_data', {
+      syncKey: accountData.value.sync_key,
+      allData: allData
+    })
+    
+    lastSyncTime.value = new Date().toLocaleTimeString()
+    updateNextSyncTime()
+    
+    showSuccess(`Manual sync completed! ${syncResult.message}`)
     
   } catch (err) {
     error.value = `Sync failed: ${err}`
@@ -779,12 +762,9 @@ async function testSyncWithEmptyData() {
     error.value = 'Account data is missing.'
     return
   }
-
   loading.value = true
   error.value = ''
-
   try {
-    // Test sync with empty/mock data
     await invoke('sync_data_enhanced', {
       syncKey: accountData.value.sync_key,
       dataType: 'test',
@@ -796,7 +776,6 @@ async function testSyncWithEmptyData() {
         timestamp: new Date().toISOString()
       }
     })
-
     showSuccess('Test sync completed successfully!')
   } catch (err) {
     error.value = `Test sync failed: ${err}`
@@ -814,53 +793,6 @@ function debugCurrentState() {
   console.log('==================')
 }
 
-// Lifecycle
-onMounted(() => {
-  // Load saved data from localStorage
-  const savedAccountData = localStorage.getItem('fansly_account_data')
-  if (savedAccountData) {
-    try {
-      accountData.value = JSON.parse(savedAccountData)
-      console.log('Loaded account data from localStorage:', accountData.value)
-    } catch (e) {
-      console.error('Failed to parse saved account data:', e)
-      localStorage.removeItem('fansly_account_data')
-    }
-  }
-    
-  const savedAuthToken = localStorage.getItem('fansly_auth_token')
-  if (savedAuthToken) {
-    authToken.value = savedAuthToken
-    console.log('Loaded auth token from localStorage')
-  }
-
-  // Load fanslyData from localStorage
-  const savedFanslyData = localStorage.getItem('fansly_data')
-  if (savedFanslyData) {
-    try {
-      fanslyData.value = JSON.parse(savedFanslyData)
-      console.log('Loaded fansly data from localStorage:', fanslyData.value)
-    } catch (e) {
-      console.error('Failed to parse saved fansly data:', e)
-      localStorage.removeItem('fansly_data')
-    }
-  }
-    
-  const savedAutoSync = localStorage.getItem('auto_sync_enabled')
-  if (savedAutoSync === 'true') {
-    autoSyncEnabled.value = true
-    startAutoSync()
-  }
-  
-  const savedDarkMode = localStorage.getItem('darkMode')
-  if (savedDarkMode !== null) {
-    darkMode.value = savedDarkMode === 'true'
-  }
-
-  // Debug current state
-  debugCurrentState()
-})
-
 function clearAllData() {
   localStorage.removeItem('fansly_account_data')
   localStorage.removeItem('fansly_auth_token')
@@ -875,7 +807,6 @@ function clearAllData() {
   showSuccess('All data cleared!')
 }
 
-// Add a function to refresh fansly data
 async function refreshFanslyData() {
   if (!authToken.value) {
     error.value = 'Auth token is missing. Please enter it again.'
@@ -885,6 +816,78 @@ async function refreshFanslyData() {
   await fetchFanslyData()
 }
 
+// Lifecycle - FIXED: Made the callback async
+onMounted(async () => {
+  // Load saved data from localStorage
+  const savedAccountData = localStorage.getItem('fansly_account_data')
+  if (savedAccountData) {
+    try {
+      accountData.value = JSON.parse(savedAccountData)
+      console.log('Loaded account data from localStorage:', accountData.value)
+    } catch (e) {
+      console.error('Failed to parse saved account data:', e)
+      localStorage.removeItem('fansly_account_data')
+    }
+  }
+  
+  const savedAuthToken = localStorage.getItem('fansly_auth_token')
+  if (savedAuthToken) {
+    authToken.value = savedAuthToken
+    console.log('Loaded auth token from localStorage')
+  }
+  
+  // Load fanslyData from localStorage
+  const savedFanslyData = localStorage.getItem('fansly_data')
+  if (savedFanslyData) {
+    try {
+      fanslyData.value = JSON.parse(savedFanslyData)
+      console.log('Loaded fansly data from localStorage:', fanslyData.value)
+    } catch (e) {
+      console.error('Failed to parse saved fansly data:', e)
+      localStorage.removeItem('fansly_data')
+    }
+  }
+  
+  const savedAutoSync = localStorage.getItem('auto_sync_enabled')
+  if (savedAutoSync === 'true') {
+    autoSyncEnabled.value = true
+    startAutoSync()
+  }
+  
+  const savedDarkMode = localStorage.getItem('darkMode')
+  if (savedDarkMode !== null) {
+    darkMode.value = savedDarkMode === 'true'
+  }
+  
+  // Listen for tray events - NOW PROPERLY AWAITED
+  try {
+    unlistenSyncNow = await listen('tray-sync-now', async () => {
+      console.log('Sync triggered from system tray')
+      await manualSyncWithProgress()
+    })
+
+    unlistenToggleAutoSync = await listen('tray-toggle-auto-sync', async () => {
+      console.log('Auto sync toggled from system tray')
+      toggleAutoSync()
+    })
+  } catch (err) {
+    console.error('Failed to set up tray event listeners:', err)
+  }
+  
+  // Debug current state
+  debugCurrentState()
+})
+
+onUnmounted(() => {
+  // Clean up event listeners
+  if (unlistenSyncNow) unlistenSyncNow()
+  if (unlistenToggleAutoSync) unlistenToggleAutoSync()
+  
+  // Clean up sync interval
+  if (syncInterval.value) {
+    clearInterval(syncInterval.value)
+  }
+})
 </script>
 
 <style>

@@ -15,6 +15,7 @@
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-shell": "^2.2.1",
     "core": "link:@tauri-apps/api/core",
+    "event": "link:@tauri-apps/api/event",
     "vue": "^3.5.13"
   },
   "devDependencies": {
