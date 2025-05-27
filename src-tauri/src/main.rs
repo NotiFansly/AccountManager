@@ -4,6 +4,7 @@
 use reqwest;
 use serde::{Deserialize, Serialize};
 //use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 use tauri::State;
 use tokio::sync::Mutex;
 
@@ -100,6 +101,90 @@ struct FanslyResponse {
 #[derive(Debug, Serialize, Deserialize)]
 struct FanslyResponseData {
     account: FanslyAccountData,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct FanslyFollowerResponse {
+    success: bool,
+    response: Vec<FanslyFollower>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct FanslyFollower {
+    #[serde(rename = "followerId")]
+    follower_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct FanslySubscriberResponse {
+    success: bool,
+    response: FanslySubscriberData,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct FanslySubscriberData {
+    subscriptions: Vec<FanslySubscriber>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct FanslySubscriber {
+    id: String,
+    #[serde(rename = "historyId")]
+    history_id: String,
+    #[serde(rename = "subscriberId")]
+    subscriber_id: String,
+    #[serde(rename = "subscriptionTierId")]
+    subscription_tier_id: String,
+    #[serde(rename = "subscriptionTierName")]
+    subscription_tier_name: String,
+    #[serde(rename = "subscriptionTierColor")]
+    subscription_tier_color: String,
+    #[serde(rename = "planId")]
+    plan_id: String,
+    #[serde(rename = "promoId")]
+    promo_id: Option<String>,
+    #[serde(rename = "giftCodeId")]
+    gift_code_id: Option<String>,
+    #[serde(rename = "paymentMethodId")]
+    payment_method_id: String,
+    status: i32,
+    price: i32,
+    #[serde(rename = "renewPrice")]
+    renew_price: i32,
+    #[serde(rename = "renewCorrelationId")]
+    renew_correlation_id: String,
+    #[serde(rename = "autoRenew")]
+    auto_renew: i32,
+    #[serde(rename = "billingCycle")]
+    billing_cycle: i32,
+    duration: i32,
+    #[serde(rename = "renewDate")]
+    renew_date: i64,
+    version: i32,
+    #[serde(rename = "createdAt")]
+    created_at: i64,
+    #[serde(rename = "updatedAt")]
+    updated_at: i64,
+    #[serde(rename = "endsAt")]
+    ends_at: i64,
+    #[serde(rename = "promoPrice")]
+    promo_price: Option<i32>,
+    #[serde(rename = "promoDuration")]
+    promo_duration: Option<i32>,
+    #[serde(rename = "promoStatus")]
+    promo_status: Option<i32>,
+    #[serde(rename = "promoStartsAt")]
+    promo_starts_at: Option<i64>,
+    #[serde(rename = "promoEndsAt")]
+    promo_ends_at: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SyncResponse {
+    success: bool,
+    message: String,
+    synced_count: Option<usize>,
+    timestamp: String,
 }
 
 struct AppState {
@@ -233,13 +318,133 @@ async fn sync_data(
 }
 
 #[tauri::command]
+async fn sync_data_enhanced(
+    state: State<'_, Mutex<AppState>>,
+    sync_key: String,
+    data_type: String,
+    data: serde_json::Value,
+) -> Result<SyncResponse, String> {
+    let state = state.lock().await;
+
+    println!(
+        "Syncing {} data with {} items",
+        data_type,
+        data.as_array().map(|arr| arr.len()).unwrap_or(0)
+    );
+
+    let request = SyncDataRequest {
+        sync_key: sync_key.clone(),
+        data_type: data_type.clone(),
+        data,
+    };
+
+    let response = state
+        .client
+        .post(&format!("{}/api/v1/sync", state.api_base_url))
+        .json(&request)
+        .timeout(std::time::Duration::from_secs(30))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let status = response.status();
+    let response_text = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read response: {}", e))?;
+
+    println!("Sync API response status: {}", status);
+    println!("Sync API response body: {}", response_text);
+
+    if status.is_success() {
+        let sync_response: SyncResponse = serde_json::from_str(&response_text).map_err(|e| {
+            format!(
+                "Failed to parse sync response: {} - Response: {}",
+                e, response_text
+            )
+        })?;
+
+        println!(
+            "Sync successful for {}: {}",
+            data_type, sync_response.message
+        );
+        Ok(sync_response)
+    } else {
+        Err(format!("Sync failed ({}): {}", status, response_text))
+    }
+}
+
+// Batch sync function for multiple data types
+#[tauri::command]
+async fn sync_all_data(
+    state: State<'_, Mutex<AppState>>,
+    sync_key: String,
+    auth_token: String,
+    user_id: String,
+) -> Result<Vec<SyncResponse>, String> {
+    let mut results = Vec::new();
+
+    // Fetch all data types
+    let followers_and_subscribers =
+        fetch_followers_and_subscribers(state.clone(), auth_token.clone(), user_id.clone()).await?;
+
+    let subscription_tiers =
+        fetch_subscription_tiers(state.clone(), auth_token.clone(), user_id.clone()).await?;
+
+    // Sync followers
+    if let Some(followers) = followers_and_subscribers.get("followers") {
+        match sync_data_enhanced(
+            state.clone(),
+            sync_key.clone(),
+            "followers".to_string(),
+            followers.clone(),
+        )
+        .await
+        {
+            Ok(response) => results.push(response),
+            Err(e) => return Err(format!("Failed to sync followers: {}", e)),
+        }
+    }
+
+    // Sync subscribers
+    if let Some(subscribers) = followers_and_subscribers.get("subscribers") {
+        match sync_data_enhanced(
+            state.clone(),
+            sync_key.clone(),
+            "subscribers".to_string(),
+            subscribers.clone(),
+        )
+        .await
+        {
+            Ok(response) => results.push(response),
+            Err(e) => return Err(format!("Failed to sync subscribers: {}", e)),
+        }
+    }
+
+    // Sync subscription tiers
+    match sync_data_enhanced(
+        state.clone(),
+        sync_key.clone(),
+        "subscription_tiers".to_string(),
+        serde_json::to_value(subscription_tiers)
+            .map_err(|e| format!("Failed to serialize tiers: {}", e))?,
+    )
+    .await
+    {
+        Ok(response) => results.push(response),
+        Err(e) => return Err(format!("Failed to sync subscription tiers: {}", e)),
+    }
+
+    Ok(results)
+}
+
+#[tauri::command]
 async fn fetch_followers_and_subscribers(
     state: State<'_, Mutex<AppState>>,
     auth_token: String,
     user_id: String,
 ) -> Result<serde_json::Value, String> {
     let state = state.lock().await;
-
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         "Authorization",
@@ -252,7 +457,7 @@ async fn fetch_followers_and_subscribers(
             .unwrap(),
     );
 
-    // Fetch followers
+    // Fetch followers with better error handling
     let mut all_followers = Vec::new();
     let mut offset = 0;
 
@@ -270,23 +475,49 @@ async fn fetch_followers_and_subscribers(
             .await
             .map_err(|e| format!("Failed to fetch followers: {}", e))?;
 
-        let data: serde_json::Value = response
-            .json()
+        // Debug the response
+        let status = response.status();
+        let response_text = response
+            .text()
             .await
-            .map_err(|e| format!("Failed to parse followers response: {}", e))?;
+            .map_err(|e| format!("Failed to read response: {}", e))?;
 
-        if let Some(followers) = data["response"].as_array() {
-            if followers.is_empty() {
-                break;
-            }
-            all_followers.extend(followers.clone());
-            offset += 100;
-        } else {
+        println!("Followers API response status: {}", status);
+        println!("Followers API response body: {}", response_text);
+
+        if !status.is_success() {
+            return Err(format!("Followers API error {}: {}", status, response_text));
+        }
+
+        // Try to parse the response
+        let follower_response: FanslyFollowerResponse = serde_json::from_str(&response_text)
+            .map_err(|e| {
+                format!(
+                    "Failed to parse followers response: {} - Response: {}",
+                    e, response_text
+                )
+            })?;
+
+        if follower_response.response.is_empty() {
+            break;
+        }
+
+        let response_len = follower_response.response.len();
+
+        for follower in &follower_response.response {
+            all_followers.push(serde_json::json!({
+                "id": follower.follower_id,
+                "followedAt": Utc::now().to_rfc3339()
+            }));
+        }
+
+        offset += 100;
+        if response_len < 100 {
             break;
         }
     }
 
-    // Fetch subscribers
+    // Fetch subscribers with better error handling
     let mut all_subscribers = Vec::new();
     offset = 0;
 
@@ -304,18 +535,56 @@ async fn fetch_followers_and_subscribers(
             .await
             .map_err(|e| format!("Failed to fetch subscribers: {}", e))?;
 
-        let data: serde_json::Value = response
-            .json()
+        let status = response.status();
+        let response_text = response
+            .text()
             .await
-            .map_err(|e| format!("Failed to parse subscribers response: {}", e))?;
+            .map_err(|e| format!("Failed to read response: {}", e))?;
 
-        if let Some(subscriptions) = data["response"]["subscriptions"].as_array() {
-            if subscriptions.is_empty() {
-                break;
-            }
-            all_subscribers.extend(subscriptions.clone());
-            offset += 100;
-        } else {
+        println!("Subscribers API response status: {}", status);
+        println!("Subscribers API response body: {}", response_text);
+
+        if !status.is_success() {
+            return Err(format!(
+                "Subscribers API error {}: {}",
+                status, response_text
+            ));
+        }
+
+        let subscriber_response: FanslySubscriberResponse = serde_json::from_str(&response_text)
+            .map_err(|e| {
+                format!(
+                    "Failed to parse subscribers response: {} - Response: {}",
+                    e, response_text
+                )
+            })?;
+
+        if subscriber_response.response.subscriptions.is_empty() {
+            break;
+        }
+
+        let subscriptions_len = subscriber_response.response.subscriptions.len();
+
+        for sub in &subscriber_response.response.subscriptions {
+            all_subscribers.push(serde_json::json!({
+                "id": sub.id,
+                "accountId": sub.subscriber_id,
+                "subscriptionTierId": sub.subscription_tier_id,
+                "status": sub.status,
+                "createdAt": DateTime::from_timestamp(sub.created_at / 1000, 0)
+                    .unwrap_or_default()
+                    .to_rfc3339(),
+                "endsAt": DateTime::from_timestamp(sub.ends_at / 1000, 0)
+                    .unwrap_or_default()
+                    .to_rfc3339(),
+                "price": sub.price,
+                "billingCycle": sub.billing_cycle,
+                "autoRenew": sub.auto_renew == 1
+            }));
+        }
+
+        offset += 100;
+        if subscriptions_len < 100 {
             break;
         }
     }
@@ -323,7 +592,7 @@ async fn fetch_followers_and_subscribers(
     let result = serde_json::json!({
         "followers": all_followers,
         "subscribers": all_subscribers,
-        "timestamp": chrono::Utc::now().to_rfc3339()
+        "timestamp": Utc::now().to_rfc3339()
     });
 
     Ok(result)
@@ -361,19 +630,31 @@ async fn fetch_subscription_tiers(
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
 
-    if response.status().is_success() {
-        let account_response: FanslyAccountResponse = response
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse response: {}", e))?;
+    let status = response.status();
+    let response_text = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read response: {}", e))?;
 
-        if let Some(account) = account_response.response.first() {
-            Ok(account.subscription_tiers.clone())
-        } else {
-            Err("No account data found".to_string())
-        }
+    println!("Subscription tiers API response status: {}", status);
+    println!("Subscription tiers API response body: {}", response_text);
+
+    if !status.is_success() {
+        return Err(format!("Fansly API error {}: {}", status, response_text));
+    }
+
+    let account_response: FanslyAccountResponse =
+        serde_json::from_str(&response_text).map_err(|e| {
+            format!(
+                "Failed to parse response: {} - Response: {}",
+                e, response_text
+            )
+        })?;
+
+    if let Some(account) = account_response.response.first() {
+        Ok(account.subscription_tiers.clone())
     } else {
-        Err(format!("Fansly API error: {}", response.status()))
+        Err("No account data found".to_string())
     }
 }
 
@@ -387,6 +668,8 @@ fn main() {
             create_account,
             fetch_fansly_data,
             sync_data,
+            sync_data_enhanced,
+            sync_all_data,
             fetch_followers_and_subscribers,
             fetch_subscription_tiers
         ])
