@@ -615,12 +615,38 @@ function updateNextSyncTime() {
   }
 }
 
+async function fetchFollowersAndSubscribers() {
+  if (!authToken.value || !fanslyData.value) {
+    error.value = 'Please fetch your Fansly data first'
+    return
+  }
+  
+  loading.value = true
+  error.value = ''
+  
+  try {
+    const data = await invoke('fetch_followers_and_subscribers', {
+      authToken: authToken.value,
+      userId: fanslyData.value.id
+    })
+    
+    // Process the data as needed
+    showSuccess('Followers and subscribers fetched successfully!')
+    return data
+  } catch (err) {
+    error.value = `Failed to fetch followers and subscribers: ${err}`
+    console.error('Error fetching followers/subscribers:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
 async function performSync() {
   console.log('performSync called')
   console.log('accountData:', accountData.value)
   console.log('authToken:', authToken.value ? 'Present' : 'Missing')
   console.log('fanslyData:', fanslyData.value)
-  
+    
   if (!accountData.value) {
     error.value = 'Account data is missing. Please create an account first.'
     return
@@ -637,53 +663,27 @@ async function performSync() {
     error.value = 'Sync key is missing from account data.'
     return
   }
-  
+    
   loading.value = true
   error.value = ''
-  
+    
   try {
     console.log('Starting sync with:', {
       syncKey: accountData.value.sync_key,
       hasAuthToken: !!authToken.value
     })
-    
-    // Fetch and sync all data
-    const allData = {
-      profile: fanslyData.value,
-      followers_subscribers: null,
-      subscription_tiers: null,
-      timestamp: new Date().toISOString()
-    }
-    
-    // Fetch followers and subscribers
-    try {
-      allData.followers_subscribers = await invoke('fetch_followers_and_subscribers', {
-        authorizationToken: authToken.value
-      })
-    } catch (err) {
-      console.warn('Failed to fetch followers/subscribers:', err)
-    }
-    
-    // Fetch subscription tiers
-    try {
-      allData.subscription_tiers = await invoke('fetch_subscription_tiers', {
-        authorizationToken: authToken.value
-      })
-    } catch (err) {
-      console.warn('Failed to fetch subscription tiers:', err)
-    }
-    
+        
     // Sync all data
     const syncResult = await invoke('sync_all_data', {
       syncKey: accountData.value.sync_key,
-      allData: allData
+      authToken: authToken.value,
+      userId: fanslyData.value.id
     })
-    
+        
     lastSyncTime.value = new Date().toLocaleTimeString()
     updateNextSyncTime()
-    
-    showSuccess(`Sync completed! ${syncResult.message}`)
-    
+        
+    showSuccess(`Sync completed! ${syncResult.message || 'Success'}`)
   } catch (err) {
     error.value = `Sync failed: ${err}`
     console.error('Sync error:', err)
@@ -701,10 +701,10 @@ async function manualSyncWithProgress() {
     error.value = 'Authorization token is missing. Please enter your Fansly auth token.'
     return
   }
-  
+    
   loading.value = true
   error.value = ''
-  
+    
   try {
     // Auto-fetch fansly data if missing
     if (!fanslyData.value) {
@@ -715,7 +715,7 @@ async function manualSyncWithProgress() {
       fanslyData.value = data
       localStorage.setItem('fansly_data', JSON.stringify(data))
     }
-    
+        
     // Fetch followers and subscribers
     showSuccess('Fetching followers and subscribers...')
     let syncData
@@ -730,7 +730,7 @@ async function manualSyncWithProgress() {
       error.value = `Failed to fetch followers/subscribers: ${err}`
       return
     }
-    
+        
     // Fetch subscription tiers
     showSuccess('Fetching subscription tiers...')
     let tiers
@@ -745,7 +745,7 @@ async function manualSyncWithProgress() {
       error.value = `Failed to fetch subscription tiers: ${err}`
       return
     }
-    
+        
     // Sync all data
     showSuccess('Syncing data to server...')
     const syncResult = await invoke('sync_all_data', {
@@ -753,11 +753,11 @@ async function manualSyncWithProgress() {
       authToken: authToken.value,
       userId: fanslyData.value.id
     })
-    
+        
     lastSyncTime.value = new Date().toLocaleTimeString()
     updateNextSyncTime()
-    
-    showSuccess(`Manual sync completed! ${syncResult.message || 'Success'}`)
+        
+    showSuccess(`Manual sync completed! ${syncResult.length ? `${syncResult.length} items synced!` : 'Success'}`)
   } catch (err) {
     error.value = `Sync failed: ${err}`
     console.error('Sync error details:', err)
