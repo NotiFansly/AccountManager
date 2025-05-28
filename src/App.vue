@@ -457,8 +457,7 @@ async function fetchFanslyData() {
   
   try {
     const data = await invoke('fetch_fansly_data', {
-      endpoint: '/api/v1/account',
-      authorizationToken: authToken.value
+      authToken: authToken.value
     })
     
     fanslyData.value = data
@@ -483,7 +482,8 @@ async function fetchSubscriptionTiers() {
   error.value = ''
   try {
     const tiers = await invoke('fetch_subscription_tiers', {
-      authorizationToken: authToken.value
+      authToken: authToken.value,
+      userId: fanslyData.value.id
     })
     subscriptionTiers.value = tiers
     showSuccess('Subscription tiers fetched successfully!')
@@ -491,8 +491,8 @@ async function fetchSubscriptionTiers() {
     // Also sync the tiers data
     if (accountData.value) {
       await invoke('sync_data_enhanced', {
-        syncKey: accountData.value.sync_key,
-        dataType: 'tiers',
+        sync_key: accountData.value.sync_key,
+        data_type: 'tiers',
         data: tiers
       })
     }
@@ -513,10 +513,24 @@ async function createAccount() {
   error.value = ''
   
   try {
+    // Extract the necessary data from fanslyData
+    const userData = fanslyData.value;
+    
+    // Make sure we have the required data
+    if (!userData || !userData.id) {
+      error.value = 'Missing required user data. Please fetch your Fansly data again.'
+      loading.value = false
+      return
+    }
+    
     const data = await invoke('create_account', {
-      syncKey: `fansly_${fanslyData.value.response?.[0]?.id || Date.now()}`
+      fanslyUserId: userData.id,
+      email: userData.email || '',
+      username: userData.username || '',
+      displayName: userData.display_name || '',
+      isCreator: isCreator.value
     })
-            
+    
     accountData.value = data
     localStorage.setItem('fansly_account_data', JSON.stringify(data))
     localStorage.setItem('fansly_auth_token', authToken.value)
@@ -530,6 +544,7 @@ async function createAccount() {
     loading.value = false
   }
 }
+
 
 function downloadCredentials() {
   if (!accountData.value) return
@@ -695,8 +710,7 @@ async function manualSyncWithProgress() {
     if (!fanslyData.value) {
       showSuccess('Fetching your Fansly profile data...')
       const data = await invoke('fetch_fansly_data', {
-        endpoint: '/api/v1/account',
-        authorizationToken: authToken.value
+        authToken: authToken.value
       })
       fanslyData.value = data
       localStorage.setItem('fansly_data', JSON.stringify(data))
@@ -707,7 +721,8 @@ async function manualSyncWithProgress() {
     let syncData
     try {
       syncData = await invoke('fetch_followers_and_subscribers', {
-        authorizationToken: authToken.value
+        authToken: authToken.value,
+        userId: fanslyData.value.id
       })
       console.log('Successfully fetched followers/subscribers:', syncData)
     } catch (err) {
@@ -721,7 +736,8 @@ async function manualSyncWithProgress() {
     let tiers
     try {
       tiers = await invoke('fetch_subscription_tiers', {
-        authorizationToken: authToken.value
+        authToken: authToken.value,
+        userId: fanslyData.value.id
       })
       console.log('Successfully fetched subscription tiers:', tiers)
     } catch (err) {
@@ -732,23 +748,16 @@ async function manualSyncWithProgress() {
     
     // Sync all data
     showSuccess('Syncing data to server...')
-    const allData = {
-      profile: fanslyData.value,
-      followers_subscribers: syncData,
-      subscription_tiers: tiers,
-      timestamp: new Date().toISOString()
-    }
-    
     const syncResult = await invoke('sync_all_data', {
       syncKey: accountData.value.sync_key,
-      allData: allData
+      authToken: authToken.value,
+      userId: fanslyData.value.id
     })
     
     lastSyncTime.value = new Date().toLocaleTimeString()
     updateNextSyncTime()
     
-    showSuccess(`Manual sync completed! ${syncResult.message}`)
-    
+    showSuccess(`Manual sync completed! ${syncResult.message || 'Success'}`)
   } catch (err) {
     error.value = `Sync failed: ${err}`
     console.error('Sync error details:', err)
