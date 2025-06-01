@@ -1,10 +1,10 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use chrono::{DateTime, Utc};
 use reqwest;
 use serde::{Deserialize, Serialize};
-//use std::collections::HashMap;
-use chrono::{DateTime, Utc};
+use std::collections::HashMap;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -187,7 +187,8 @@ struct FanslySubscriber {
 struct SyncResponse {
     success: bool,
     message: String,
-    synced_count: Option<usize>,
+    data_type: String,
+    count: i32,
     timestamp: String,
 }
 
@@ -447,7 +448,8 @@ async fn fetch_followers_and_subscribers(
     state: State<'_, Mutex<AppState>>,
     auth_token: String,
     user_id: String,
-) -> Result<serde_json::Value, String> {
+) -> Result<HashMap<String, serde_json::Value>, String> {
+    // Changed return type
     let state = state.lock().await;
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
@@ -464,13 +466,11 @@ async fn fetch_followers_and_subscribers(
     // Fetch followers with better error handling
     let mut all_followers = Vec::new();
     let mut offset = 0;
-
     loop {
         let url = format!(
             "https://apiv3.fansly.com/api/v1/account/{}/followers?ngsw-bypass=true&limit=100&offset={}",
             user_id, offset
         );
-
         let response = state
             .client
             .get(&url)
@@ -507,7 +507,6 @@ async fn fetch_followers_and_subscribers(
         }
 
         let response_len = follower_response.response.len();
-
         for follower in &follower_response.response {
             all_followers.push(serde_json::json!({
                 "id": follower.follower_id,
@@ -521,16 +520,14 @@ async fn fetch_followers_and_subscribers(
         }
     }
 
-    // Fetch subscribers with better error handling
+    // Fetch subscribers with better error handling - KEEP YOUR STATUS FILTER
     let mut all_subscribers = Vec::new();
     offset = 0;
-
     loop {
         let url = format!(
             "https://apiv3.fansly.com/api/v1/subscribers?status=3,4&limit=100&offset={}&ngsw-bypass=true",
             offset
         );
-
         let response = state
             .client
             .get(&url)
@@ -568,7 +565,6 @@ async fn fetch_followers_and_subscribers(
         }
 
         let subscriptions_len = subscriber_response.response.subscriptions.len();
-
         for sub in &subscriber_response.response.subscriptions {
             all_subscribers.push(serde_json::json!({
                 "id": sub.id,
@@ -593,11 +589,16 @@ async fn fetch_followers_and_subscribers(
         }
     }
 
-    let result = serde_json::json!({
-        "followers": all_followers,
-        "subscribers": all_subscribers,
-        "timestamp": Utc::now().to_rfc3339()
-    });
+    // Return as HashMap for sync_all_data compatibility
+    let mut result = HashMap::new();
+    result.insert(
+        "followers".to_string(),
+        serde_json::Value::Array(all_followers),
+    );
+    result.insert(
+        "subscribers".to_string(),
+        serde_json::Value::Array(all_subscribers),
+    );
 
     Ok(result)
 }

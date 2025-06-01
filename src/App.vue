@@ -343,20 +343,7 @@
                 {{ loading ? 'Syncing...' : 'Manual Sync Now' }}
               </div>
             </button>
-
-            <!-- Test sync button for debugging 
-      <button
-        @click="testSyncWithEmptyData"
-        :disabled="loading"
-        class="glass-button-secondary px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-      >
-        <div class="flex items-center justify-center">
-          <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-          </svg>
-          Test Sync
-        </div>
-</button>-->
+ 
           </div>
         </div>
 
@@ -487,12 +474,12 @@ async function fetchSubscriptionTiers() {
     })
     subscriptionTiers.value = tiers
     showSuccess('Subscription tiers fetched successfully!')
-    
-    // Also sync the tiers data
+        
+    // Fix this part - change 'tiers' to 'subscription_tiers'
     if (accountData.value) {
       await invoke('sync_data_enhanced', {
-        sync_key: accountData.value.sync_key,
-        data_type: 'tiers',
+        syncKey: accountData.value.sync_key,  // Also fix camelCase
+        dataType: 'subscription_tiers',       // Changed from 'tiers'
         data: tiers
       })
     }
@@ -690,6 +677,10 @@ async function performSync() {
   } finally {
     loading.value = false
   }
+}
+
+async function manualSync() {
+  await manualSyncWithProgress()
 }
 
 async function manualSyncWithProgress() {
