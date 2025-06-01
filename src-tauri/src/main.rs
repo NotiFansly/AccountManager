@@ -34,6 +34,7 @@ struct SyncDataRequest {
     sync_key: String,
     data_type: String,
     data: serde_json::Value,
+    sync_mode: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -301,6 +302,7 @@ async fn sync_data(
         sync_key,
         data_type,
         data,
+        sync_mode: "replace".to_string(),
     };
 
     let response = state
@@ -341,6 +343,7 @@ async fn sync_data_enhanced(
         sync_key: sync_key.clone(),
         data_type: data_type.clone(),
         data,
+        sync_mode: "replace".to_string(),
     };
 
     let response = state
