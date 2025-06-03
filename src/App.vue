@@ -1,9 +1,7 @@
 <template>
   <div class="min-h-screen transition-all duration-500" :class="darkMode ? 'dark' : ''">
-    <!-- Background with gradient -->
     <div class="fixed inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 dark:from-gray-900 dark:via-purple-900 dark:to-indigo-900"></div>
     
-    <!-- Animated background elements -->
     <div class="fixed inset-0 overflow-hidden pointer-events-none">
       <div class="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
       <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
@@ -11,7 +9,6 @@
     </div>
 
     <div class="relative z-10 min-h-screen p-4 sm:p-8">
-      <!-- Header with dark mode toggle -->
       <header class="flex justify-between items-center mb-8">
         <h1 class="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
           Fansly Account Manager
@@ -30,7 +27,6 @@
       </header>
 
       <div class="max-w-6xl mx-auto space-y-8">
-        <!-- Step 1: Fetch Fansly Data -->
         <div class="glass-card p-8 rounded-2xl hover:scale-[1.02] transition-all duration-300">
           <div class="flex items-center mb-6">
             <div class="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold mr-4">
@@ -81,7 +77,6 @@
           </div>
         </div>
 
-        <!-- Step 2: Review Data -->
         <div v-if="fanslyData" class="glass-card p-8 rounded-2xl hover:scale-[1.02] transition-all duration-300 animate-fade-in">
           <div class="flex items-center mb-6">
             <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold mr-4">
@@ -127,7 +122,6 @@
             </div>
           </div>
 
-          <!-- Add refresh button -->
           <button
             @click="refreshFanslyData"
             :disabled="loading"
@@ -146,7 +140,6 @@
           </button>
         </div>
 
-        <!-- Step 3: Create Account -->
         <div v-if="fanslyData" class="glass-card p-8 rounded-2xl hover:scale-[1.02] transition-all duration-300 animate-fade-in">
           <div class="flex items-center mb-6">
             <div class="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center text-white font-bold mr-4">
@@ -156,16 +149,6 @@
           </div>
           
           <div class="space-y-6">
-            <div class="flex items-center space-x-3">
-              <input
-                v-model="isCreator"
-                type="checkbox"
-                id="isCreator"
-                class="w-5 h-5 text-purple-600 bg-transparent border-2 border-gray-400 rounded focus:ring-purple-500 focus:ring-2"
-              />
-              <label for="isCreator" class="text-white font-medium cursor-pointer">I am a content creator</label>
-            </div>
-            
             <button
               @click="createAccount"
               :disabled="loading"
@@ -182,7 +165,6 @@
           </div>
         </div>
 
-        <!-- Step 4: Account Created -->
         <div v-if="accountData" class="glass-card p-8 rounded-2xl hover:scale-[1.02] transition-all duration-300 animate-fade-in">
           <div class="flex items-center mb-6">
             <div class="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold mr-4">
@@ -282,7 +264,6 @@
           </div>
         </div>
 
-        <!-- Step 5: Auto Sync -->
         <div v-if="accountData" class="glass-card p-8 rounded-2xl hover:scale-[1.02] transition-all duration-300 animate-fade-in">
           <div class="flex items-center mb-6">
             <div class="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold mr-4">
@@ -343,11 +324,10 @@
                 {{ loading ? 'Syncing...' : 'Manual Sync Now' }}
               </div>
             </button>
- 
+  
           </div>
         </div>
 
-        <!-- Error Display -->
         <div v-if="error" class="glass-card-error p-6 rounded-2xl border border-red-500/20 bg-red-500/5 animate-fade-in">
           <div class="flex items-start space-x-3">
             <svg class="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -360,12 +340,11 @@
             <button @click="error = ''" class="ml-auto text-red-400 hover:text-red-300 transition-colors">
               <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-              </svg>
+            </svg>
             </button>
           </div>
         </div>
 
-        <!-- Success Toast -->
         <div v-if="showSuccessToast" class="fixed top-4 right-4 glass-card p-4 rounded-xl border border-green-500/20 bg-green-500/5 animate-slide-in-right z-50">
           <div class="flex items-center space-x-3">
             <svg class="w-6 h-6 text-green-400" fill="currentColor" viewBox="0 0 20 20">
@@ -395,7 +374,7 @@ const showToken = ref(false)
 const showPassword = ref(false)
 const fanslyData = ref(null)
 const accountData = ref(null)
-const isCreator = ref(true)
+// const isCreator = ref(true) // Removed - now dynamically determined
 const loading = ref(false)
 const error = ref('')
 const autoSyncEnabled = ref(false)
@@ -474,15 +453,15 @@ async function fetchSubscriptionTiers() {
     })
     subscriptionTiers.value = tiers
     showSuccess('Subscription tiers fetched successfully!')
-        
-    // Fix this part - change 'tiers' to 'subscription_tiers'
-    if (accountData.value) {
-      await invoke('sync_data_enhanced', {
-        syncKey: accountData.value.sync_key,  // Also fix camelCase
-        dataType: 'subscription_tiers',       // Changed from 'tiers'
-        data: tiers
-      })
-    }
+          
+    // This sync call should be handled by sync_all_data now if it's part of the main sync flow
+    // if (accountData.value) {
+    //   await invoke('sync_data_enhanced', {
+    //     syncKey: accountData.value.sync_key,
+    //     dataType: 'subscription_tiers',
+    //     data: tiers
+    //   })
+    // }
   } catch (err) {
     error.value = `Failed to fetch subscription tiers: ${err}`
   } finally {
@@ -509,13 +488,22 @@ async function createAccount() {
       loading.value = false
       return
     }
+
+    // Determine if the user is a creator based on subscriber count
+    const isUserCreator = (userData.subscriberCount && userData.subscriberCount > 0);
+
+    if (!isUserCreator) {
+        error.value = 'You need to have at least one subscriber on Fansly to create a creator account in the dashboard. If you are not a creator, this dashboard might not be for you.'
+        loading.value = false
+        return;
+    }
     
     const data = await invoke('create_account', {
       fanslyUserId: userData.id,
       email: userData.email || '',
       username: userData.username || '',
       displayName: userData.display_name || '',
-      isCreator: isCreator.value
+      isCreator: isUserCreator // Pass the dynamically determined value
     })
     
     accountData.value = data
@@ -536,6 +524,8 @@ async function createAccount() {
 function downloadCredentials() {
   if (!accountData.value) return
   const credentials = {
+    account_id: accountData.value.account_id, // Ensure account_id is included
+    password: accountData.value.password,     // Ensure password is included
     sync_key: accountData.value.sync_key,
     api_base_url: accountData.value.api_base_url,
     created_at: new Date().toISOString(),
@@ -633,7 +623,7 @@ async function performSync() {
   console.log('accountData:', accountData.value)
   console.log('authToken:', authToken.value ? 'Present' : 'Missing')
   console.log('fanslyData:', fanslyData.value)
-    
+      
   if (!accountData.value) {
     error.value = 'Account data is missing. Please create an account first.'
     return
@@ -650,26 +640,26 @@ async function performSync() {
     error.value = 'Sync key is missing from account data.'
     return
   }
-    
+      
   loading.value = true
   error.value = ''
-    
+      
   try {
     console.log('Starting sync with:', {
       syncKey: accountData.value.sync_key,
       hasAuthToken: !!authToken.value
     })
-        
+          
     // Sync all data
     const syncResult = await invoke('sync_all_data', {
       syncKey: accountData.value.sync_key,
       authToken: authToken.value,
       userId: fanslyData.value.id
     })
-        
+          
     lastSyncTime.value = new Date().toLocaleTimeString()
     updateNextSyncTime()
-        
+          
     showSuccess(`Sync completed! ${syncResult.message || 'Success'}`)
   } catch (err) {
     error.value = `Sync failed: ${err}`
@@ -692,10 +682,10 @@ async function manualSyncWithProgress() {
     error.value = 'Authorization token is missing. Please enter your Fansly auth token.'
     return
   }
-    
+      
   loading.value = true
   error.value = ''
-    
+      
   try {
     // Auto-fetch fansly data if missing
     if (!fanslyData.value) {
@@ -706,48 +696,18 @@ async function manualSyncWithProgress() {
       fanslyData.value = data
       localStorage.setItem('fansly_data', JSON.stringify(data))
     }
-        
-    // Fetch followers and subscribers
-    showSuccess('Fetching followers and subscribers...')
-    let syncData
-    try {
-      syncData = await invoke('fetch_followers_and_subscribers', {
-        authToken: authToken.value,
-        userId: fanslyData.value.id
-      })
-      console.log('Successfully fetched followers/subscribers:', syncData)
-    } catch (err) {
-      console.error('Error fetching followers/subscribers:', err)
-      error.value = `Failed to fetch followers/subscribers: ${err}`
-      return
-    }
-        
-    // Fetch subscription tiers
-    showSuccess('Fetching subscription tiers...')
-    let tiers
-    try {
-      tiers = await invoke('fetch_subscription_tiers', {
-        authToken: authToken.value,
-        userId: fanslyData.value.id
-      })
-      console.log('Successfully fetched subscription tiers:', tiers)
-    } catch (err) {
-      console.error('Error fetching subscription tiers:', err)
-      error.value = `Failed to fetch subscription tiers: ${err}`
-      return
-    }
-        
-    // Sync all data
-    showSuccess('Syncing data to server...')
+          
+    // Sync all data (this backend call should fetch followers, subscribers, and tiers)
+    showSuccess('Syncing all data to server...')
     const syncResult = await invoke('sync_all_data', {
       syncKey: accountData.value.sync_key,
       authToken: authToken.value,
       userId: fanslyData.value.id
     })
-        
+          
     lastSyncTime.value = new Date().toLocaleTimeString()
     updateNextSyncTime()
-        
+          
     showSuccess(`Manual sync completed! ${syncResult.length ? `${syncResult.length} items synced!` : 'Success'}`)
   } catch (err) {
     error.value = `Sync failed: ${err}`
@@ -1018,4 +978,3 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.5);
 }
 </style>
-
