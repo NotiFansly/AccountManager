@@ -548,7 +548,7 @@ function downloadCredentials() {
 }
 
 async function openDashboard() {
-  await open('https://your-dashboard-url.com')
+  await open('https://creator.notifansly.xyz')
 }
 
 function toggleAutoSync() {

@@ -24,6 +24,22 @@ fn main() {
             api_base_url: "http://localhost:1880".to_string(),
         }))
         .setup(|app| {
+            // Initialize autostart plugin in setup
+            #[cfg(desktop)]
+            {
+                use tauri_plugin_autostart::MacosLauncher;
+                use tauri_plugin_autostart::ManagerExt;
+
+                app.handle().plugin(tauri_plugin_autostart::init(
+                    MacosLauncher::LaunchAgent,
+                    Some(vec!["--minimized"]), // You can add startup flags here
+                ))?;
+
+                // Optionally enable autostart by default
+                let autostart_manager = app.autolaunch();
+                let _ = autostart_manager.enable();
+            }
+
             // Create menu items with correct syntax
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let show = MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
@@ -114,7 +130,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             create_account,
             fetch_fansly_data,
-            sync_data, // Assuming sync_data is still needed in main.rs, otherwise remove from here and dashboard.rs
+            sync_data,
             sync_data_enhanced,
             sync_all_data,
             fetch_followers_and_subscribers,
