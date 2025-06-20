@@ -11,13 +11,19 @@ pub struct AppState {
 }
 
 // All structs and their fields are now public
-#[derive(Debug, Serialize, Deserialize)]
+/*#[derive(Debug, Serialize, Deserialize)]
 pub struct CreateAccountRequest {
     pub fansly_user_id: String,
     pub email: String,
     pub username: String,
     pub display_name: String,
     pub is_creator: bool,
+}*/
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateAccountRequest {
+    #[serde(rename = "fanslyProfile")]
+    pub fansly_profile: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

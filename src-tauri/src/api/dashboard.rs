@@ -17,26 +17,17 @@ use super::fansly::{fetch_followers_and_subscribers, fetch_subscription_tiers};
 #[tauri::command]
 pub async fn create_account(
     state: State<'_, Mutex<AppState>>,
-    fansly_user_id: String,
-    email: String,
-    username: String,
-    display_name: String,
-    is_creator: bool,
+    fansly_profile: serde_json::Value,
 ) -> Result<CreateAccountResponse, String> {
     let state = state.lock().await;
 
-    let request = CreateAccountRequest {
-        fansly_user_id,
-        email,
-        username,
-        display_name,
-        is_creator,
-    };
+    // Create the new request struct, wrapping the profile data.
+    let request = CreateAccountRequest { fansly_profile };
 
     let response = state
         .client
         .post(&format!("{}/api/v1/accounts", state.api_base_url))
-        .json(&request)
+        .json(&request) // reqwest will serialize our struct into the correct JSON payload.
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
@@ -48,11 +39,12 @@ pub async fn create_account(
             .map_err(|e| format!("Failed to parse response: {}", e))?;
         Ok(account_response)
     } else {
+        // This will now correctly return the server's validation error
         let error_text = response
             .text()
             .await
-            .unwrap_or_else(|_| "Unknown error".to_string());
-        Err(format!("API error: {}", error_text))
+            .unwrap_or_else(|_| "Unknown API error".to_string());
+        Err(format!("{}", error_text)) // Just return the error message directly
     }
 }
 

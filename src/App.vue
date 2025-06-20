@@ -337,18 +337,8 @@ async function createAccount() {
   error.value = ''
   
   try {
-    // Extract the necessary data from fanslyData
-    const userData = fanslyData.value;
-    
-    // Make sure we have the required data
-    if (!userData || !userData.id) {
-      error.value = 'Missing required user data. Please fetch your Fansly data again.'
-      loading.value = false
-      return
-    }
-
     // Determine if the user is a creator based on subscriber count
-    const isUserCreator = (userData.subscriberCount && userData.subscriberCount > 0);
+    const isUserCreator = (fanslyData.value.subscriberCount && fanslyData.value.subscriberCount > 0);
 
     if (!isUserCreator) {
         error.value = 'You need to have at least one subscriber on Fansly to create a creator account in the dashboard. If you are not a creator, this dashboard might not be for you.'
@@ -357,23 +347,19 @@ async function createAccount() {
     }
     
     const data = await invoke('create_account', {
-      fanslyUserId: userData.id,
-      email: userData.email || '',
-      username: userData.username || '',
-      displayName: userData.display_name || '',
-      isCreator: isUserCreator // Pass the dynamically determined value
+      fanslyProfile: fanslyData.value 
     })
     
     accountData.value = data
     localStorage.setItem('fansly_account_data', JSON.stringify(data))
     localStorage.setItem('fansly_auth_token', authToken.value)
-    // Also save fanslyData when creating account
     localStorage.setItem('fansly_data', JSON.stringify(fanslyData.value))
     
     showSuccess('Account created successfully!')
 
     viewState.value = 'dashboard';
   } catch (err) {
+    // The error from the server will now be more specific!
     error.value = `Failed to create account: ${err}`
   } finally {
     loading.value = false
