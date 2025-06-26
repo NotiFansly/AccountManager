@@ -9,16 +9,18 @@ use crate::api::fansly::{
     fetch_fansly_data, fetch_followers_and_subscribers, fetch_subscription_tiers,
 };
 use crate::models::AppState;
-use reqwest; // Keep this as reqwest::Client is used here directly
+use reqwest;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager, WindowEvent,
 };
+use tauri_plugin_updater::UpdaterExt; // <-- ADDED: Needed for the .updater() method
 use tokio::sync::Mutex;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Mutex::new(AppState {
             client: reqwest::Client::new(),
             api_base_url: "http://localhost:1880".to_string(),
@@ -114,6 +116,35 @@ fn main() {
                     }
                 })
                 .build(app)?;
+
+            // This code runs in the background when the app starts.
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Ok(updater) = handle.updater() {
+                    match updater.check().await {
+                        Ok(Some(update)) => {
+                            println!(
+                                "Update found: {} (current version: {})",
+                                update.version, update.current_version
+                            );
+                            if let Err(e) = update.download_and_install(|_, _| {}, || {}).await {
+                                eprintln!("Failed to install update: {}", e);
+                            } else {
+                                println!("Update installed, restarting application...");
+                                handle.restart();
+                            }
+                        }
+                        Ok(None) => {
+                            println!("App is up to date.");
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to check for updates: {}", e);
+                        }
+                    }
+                } else {
+                    eprintln!("Failed to get updater instance.");
+                }
+            });
 
             Ok(())
         })
