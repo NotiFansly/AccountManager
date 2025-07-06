@@ -32,7 +32,7 @@ pub async fn fetch_fansly_data(
     );
     headers.insert(
         "User-Agent",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        "NotiFansly/1.0 (Creator Dashboard; Discord-Integration; +https://notifansly.xyz)"
             .parse()
             .unwrap(),
     );
@@ -83,7 +83,7 @@ pub async fn fetch_followers_and_subscribers(
     );
     headers.insert(
         "User-Agent",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        "NotiFansly/1.0 (Creator Dashboard; Discord-Integration; +https://notifansly.xyz)"
             .parse()
             .unwrap(),
     );
@@ -242,7 +242,7 @@ pub async fn fetch_subscription_tiers(
     );
     headers.insert(
         "User-Agent",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        "NotiFansly/1.0 (Creator Dashboard; Discord-Integration; +https://notifansly.xyz)"
             .parse()
             .unwrap(),
     );
