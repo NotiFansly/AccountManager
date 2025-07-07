@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/NotiFansly/AccountManager/main/src-tauri/icons/icon.png" alt="NotiFansly AccountManager Logo" width="128" height="128">
+  <img src="https://github.com/NotiFansly/AccountManager/blob/master/src-tauri/icons/icon.png" alt="NotiFansly AccountManager Logo" width="128" height="128">
   <h1>NotiFansly AccountManager</h1>
   <p><strong>A secure, open-source desktop tool to sync your Fansly data with third-party services.</strong></p>
   <p>
