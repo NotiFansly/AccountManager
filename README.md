@@ -1,16 +1,40 @@
-# Tauri + Vue + TypeScript
+<div align="center">
+  <img src="https://raw.githubusercontent.com/NotiFansly/AccountManager/main/src-tauri/icons/icon.png" alt="NotiFansly AccountManager Logo" width="128" height="128">
+  <h1>NotiFansly AccountManager</h1>
+  <p><strong>A secure, open-source desktop tool to sync your Fansly data with third-party services.</strong></p>
+  <p>
+    <a href="https://github.com/NotiFansly/AccountManager/releases/latest">
+      <img src="https://img.shields.io/github/v/release/NotiFansly/AccountManager?style=for-the-badge&logo=github&color=363a4f&logoColor=D9E0EE&labelColor=494d64" alt="Latest Release"/>
+    </a>
+    <a href="https://github.com/NotiFansly/AccountManager/actions/workflows/release.yml">
+      <img src="https://img.shields.io/github/actions/workflow/status/NotiFansly/AccountManager/release.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=D9E0EE&label=Build&color=88C0D0" alt="Build Status"/>
+    </a>
+  </p>
+</div>
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+## About The Project
 
-## Recommended IDE Setup
+NotiFansly AccountManager was created for the [NotiFansly](https://creator.notifansly.xyz) platform to give creators a secure way to synchronize their data (like followers, subscribers, and subscription tiers) with our services.
 
-- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+We believe creators should never have to hand over their account credentials. This tool runs directly on your computer, using your Fansly authorization token locally to fetch data and send it to a service of your choice using a secure `sync_key`.
 
-## Type Support For `.vue` Imports in TS
+**Your Fansly token is never stored or sent anywhere except directly to Fansly's API from your own machine.**
 
-Since TypeScript cannot handle type information for `.vue` imports, they are shimmed to be a generic Vue component type by default. In most cases this is fine if you don't really care about component prop types outside of templates. However, if you wish to get actual prop types in `.vue` imports (for example to get props validation when using manual `h(...)` calls), you can enable Volar's Take Over mode by following these steps:
+## How It Works
 
-1. Run `Extensions: Show Built-in Extensions` from VS Code's command palette, look for `TypeScript and JavaScript Language Features`, then right click and select `Disable (Workspace)`. By default, Take Over mode will enable itself if the default TypeScript extension is disabled.
-2. Reload the VS Code window by running `Developer: Reload Window` from the command palette.
+1.  **Authenticate**: You provide your Fansly auth token to the app, which is stored securely on your computer.
+2.  **Link Account**: The app communicates with the third-party service, NotiFansly, to create a linked account.
+3.  **Sync Data**: The app uses your token to fetch the latest data from Fansly, then sends it to the service. The service never sees your Fansly token.
 
-You can learn more about Take Over mode [here](https://github.com/johnsoncodehk/volar/discussions/471).
+This tool is open-source and can be adapted for any developer or service that wishes to integrate with Fansly data in a secure, creator-first manner.
+
+## Getting Started & Installation
+
+You can download the latest version of NotiFansly AccountManager for Windows, macOS, and Linux from our **[Releases Page](https://github.com/NotiFansly/AccountManager/releases/latest)**.
+
+For detailed instructions on how to use FanslySync with the NotiFansly platform, please visit our documentation:
+
+**📖 [View the Full Documentation](https://creator.notifansly.xyz/docs/creator-platform/getting-started#step-1-the-desktop-sync-app)**
+## License
+
+This project is distributed under the MIT License. See `LICENSE` for more information.
