@@ -14,7 +14,7 @@
 
 ## About The Project
 
-NotiFansly AccountManager was created for the [NotiFansly](https://creator.notifansly.xyz) platform to give creators a secure way to synchronize their data (like followers, subscribers, and subscription tiers) with our services.
+NotiFansly AccountManager was created for the [NotiFansly Creator](https://creator.notifansly.xyz) platform to give creators a secure way to synchronize their data (like followers, subscribers, and subscription tiers) with our services.
 
 We believe creators should never have to hand over their account credentials. This tool runs directly on your computer, using your Fansly authorization token locally to fetch data and send it to a service of your choice using a secure `sync_key`.
 
