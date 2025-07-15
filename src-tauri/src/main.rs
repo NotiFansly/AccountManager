@@ -15,7 +15,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager, WindowEvent,
 };
-use tauri_plugin_updater::UpdaterExt; // <-- ADDED: Needed for the .updater() method
+use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::Mutex;
 
 fn main() {
@@ -23,7 +23,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Mutex::new(AppState {
             client: reqwest::Client::new(),
-            api_base_url: "http://localhost:1880".to_string(),
+            api_base_url: "https://api.notifansly.xyz".to_string(),
         }))
         .setup(|app| {
             // Initialize autostart plugin in setup
