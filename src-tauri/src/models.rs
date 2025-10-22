@@ -1,196 +1,112 @@
-//use chrono::{DateTime, Utc};
+use reqwest;
 use serde::{Deserialize, Serialize};
-// Removed unused tauri imports: Menu, MenuItem, MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent, Emitter, Manager, State, WindowEvent
-use reqwest; // Add reqwest for AppState
-             //use tokio::sync::Mutex; // Add Mutex for AppState
 
-// AppState definition
+// The application state, holds a shared reqwest client and the API base URL.
 pub struct AppState {
     pub client: reqwest::Client,
     pub api_base_url: String,
 }
 
-// All structs and their fields are now public
-/*#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateAccountRequest {
-    pub fansly_user_id: String,
-    pub email: String,
-    pub username: String,
-    pub display_name: String,
-    pub is_creator: bool,
-}*/
+// --- Fansly API Models ---
+// These structs are for parsing responses directly from Fansly's API.
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateAccountRequest {
-    #[serde(rename = "fanslyProfile")]
-    pub fansly_profile: serde_json::Value,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateAccountResponse {
-    pub account_id: String,
-    pub password: String,
-    pub sync_key: String,
-    pub user_id: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SyncDataRequest {
-    pub sync_key: String,
-    pub data_type: String,
-    pub data: serde_json::Value,
-    pub sync_mode: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone as it was for SubscriptionTier
-pub struct FanslyAccountData {
+// --- FIX: Added Serialize ---
+// This is returned by the `get_fansly_profile` command.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FanslyProfile {
     pub id: String,
-    pub email: String,
     pub username: String,
-    #[serde(rename = "displayName")]
-    pub display_name: String,
-    #[serde(rename = "followCount")]
-    pub follow_count: i32,
-    #[serde(rename = "subscriberCount")]
-    pub subscriber_count: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Deserialize, Debug)]
+pub struct FanslyProfileWrapper {
+    pub account: FanslyProfile,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct FanslyProfileResponse {
+    pub success: bool,
+    pub response: FanslyProfileWrapper,
+}
+
+#[derive(Deserialize, Debug, Serialize)]
 pub struct SubscriptionTier {
     pub id: String,
-    #[serde(rename = "accountId")]
-    pub account_id: String,
     pub name: String,
-    pub color: String,
-    pub pos: i32,
-    pub price: i32,
-    #[serde(rename = "maxSubscribers")]
-    pub max_subscribers: i32,
-    #[serde(rename = "subscriptionBenefits")]
-    pub subscription_benefits: Vec<String>,
-    #[serde(rename = "includedTierIds")]
-    pub included_tier_ids: Vec<String>,
-    pub plans: Vec<SubscriptionPlan>,
+    pub price: i32, // in cents
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SubscriptionPlan {
-    pub id: String,
-    pub status: i32,
-    #[serde(rename = "billingCycle")]
-    pub billing_cycle: i32,
-    pub price: i32,
-    #[serde(rename = "useAmounts")]
-    pub use_amounts: i32,
-    pub promos: Vec<serde_json::Value>, // Keep as generic for now
-    pub uses: i32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone for consistency
-pub struct FanslyAccountResponse {
-    pub success: bool,
-    pub response: Vec<FanslyAccountDetails>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone for consistency
-pub struct FanslyAccountDetails {
-    pub id: String,
-    pub username: String,
-    #[serde(rename = "displayName")]
-    pub display_name: String,
+#[derive(Deserialize, Debug)]
+pub struct AccountDetails {
     #[serde(rename = "subscriptionTiers")]
     pub subscription_tiers: Vec<SubscriptionTier>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone for consistency
-pub struct FanslyResponse {
+#[derive(Deserialize, Debug)]
+pub struct AccountDetailsResponse {
     pub success: bool,
-    pub response: FanslyResponseData,
+    pub response: Vec<AccountDetails>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone for consistency
-pub struct FanslyResponseData {
-    pub account: FanslyAccountData,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone for consistency
-pub struct FanslyFollowerResponse {
-    pub success: bool,
-    pub response: Vec<FanslyFollower>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone for consistency
+#[derive(Deserialize, Debug, Serialize)]
 pub struct FanslyFollower {
     #[serde(rename = "followerId")]
     pub follower_id: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone for consistency
-pub struct FanslySubscriberResponse {
+#[derive(Deserialize, Debug)]
+pub struct FanslyFollowerResponse {
     pub success: bool,
-    pub response: FanslySubscriberData,
+    pub response: Vec<FanslyFollower>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone for consistency
-pub struct FanslySubscriberData {
-    pub subscriptions: Vec<FanslySubscriber>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct FanslySubscriber {
-    pub id: String,
-    #[serde(rename = "historyId")]
-    pub history_id: String,
     #[serde(rename = "subscriberId")]
     pub subscriber_id: String,
     #[serde(rename = "subscriptionTierId")]
     pub subscription_tier_id: String,
-    #[serde(rename = "subscriptionTierName")]
-    pub subscription_tier_name: String,
-    #[serde(rename = "subscriptionTierColor")]
-    pub subscription_tier_color: String,
-    #[serde(rename = "planId")]
-    pub plan_id: String,
-    #[serde(rename = "promoId")]
-    pub promo_id: Option<String>,
-    #[serde(rename = "giftCodeId")]
-    pub gift_code_id: Option<String>,
-    #[serde(rename = "paymentMethodId")]
-    pub payment_method_id: String,
-    pub status: i32,
-    pub price: i32,
-    #[serde(rename = "renewPrice")]
-    pub renew_price: i32,
-    #[serde(rename = "renewCorrelationId")]
-    pub renew_correlation_id: String,
-    #[serde(rename = "autoRenew")]
-    pub auto_renew: i32,
-    #[serde(rename = "billingCycle")]
-    pub billing_cycle: i32,
-    pub duration: i32,
-    #[serde(rename = "renewDate")]
-    pub renew_date: i64,
-    pub version: i32,
-    #[serde(rename = "createdAt")]
-    pub created_at: i64,
-    #[serde(rename = "updatedAt")]
-    pub updated_at: i64,
     #[serde(rename = "endsAt")]
     pub ends_at: i64,
-    #[serde(rename = "promoPrice")]
-    pub promo_price: Option<i32>,
-    #[serde(rename = "promoDuration")]
-    pub promo_duration: Option<i32>,
-    #[serde(rename = "promoStatus")]
-    pub promo_status: Option<i32>,
-    #[serde(rename = "promoStartsAt")]
-    pub promo_starts_at: Option<i64>,
-    #[serde(rename = "promoEndsAt")]
-    pub promo_ends_at: Option<i64>,
+    pub status: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone for consistency
-pub struct SyncResponse {
+#[derive(Deserialize, Debug)]
+pub struct SubscriberData {
+    pub subscriptions: Vec<FanslySubscriber>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct FanslySubscriberResponse {
+    pub success: bool,
+    pub response: SubscriberData,
+}
+
+// --- Backend API Models ---
+// These structs are for communicating with YOUR new API service.
+
+#[derive(Serialize)]
+pub struct VerifyCreatorRequest<'a> {
+    #[serde(rename = "fanslyProfile")]
+    pub fansly_profile: &'a FanslyProfile,
+}
+
+// --- FIX: Added Serialize ---
+// This is returned by the `verify_creator_account` command.
+#[derive(Deserialize, Debug, Serialize)]
+pub struct VerifyCreatorResponse {
+    pub sync_key: String,
+}
+
+#[derive(Serialize)]
+pub struct SyncDataRequest<T> {
+    pub sync_key: String,
+    pub data_type: String,
+    pub data: T,
+}
+
+#[derive(Deserialize, Debug, Serialize, Clone)]
+pub struct SyncDataResponse {
     pub success: bool,
     pub message: String,
     pub data_type: String,
